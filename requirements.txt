@@ -1,0 +1,6 @@
+transformers
+torch
+langchain
+openai  # Or your chosen LLM provider's library
+chromadb  # Or your chosen vector database library
+python-dotenv # For loading environment variables
