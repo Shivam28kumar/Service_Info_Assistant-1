@@ -1,10 +1,11 @@
 import os
 from dotenv import load_dotenv
 
+
 # 1. Integration Packages
 from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpoint, ChatHuggingFace
 from langchain_chroma import Chroma
-
+from langchain_classic.agents import create_tool_calling_agent, AgentExecutor
 # 2. Agent & Tool Packages
 from langchain_core.tools import tool, create_retriever_tool
 from langchain_classic.agents import AgentExecutor, create_structured_chat_agent
@@ -72,16 +73,21 @@ def setup_agentic_pipeline():
     tools = [retriever_tool, custom_pricing_calculator]
 
     print("4. Building the Agent...")
-    # Pull a prompt designed to force the LLM to output tool calls in JSON
-    prompt = hub.pull("hwchase17/structured-chat-agent")
     
-    # OVERRIDE the default system message to stop rogue tool usage
-    prompt.messages[0].prompt.template = """You are the official customer support agent for TechGadgets. 
-    You must ONLY use the tools explicitly provided to you. NEVER use external tools like 'repo_browser' or 'search'. 
-    If a user asks what we do, what our products are, or asks a general question, ALWAYS use the 'techgadgets_service_search' tool to find the answer."""
+    # 1. Pull the standard tool-calling prompt
+    prompt = hub.pull("hwchase17/openai-tools-agent")
     
-    # Create the structured agent instead of the standard react agent
-    agent = create_structured_chat_agent(llm, tools, prompt)
+    # 2. OVERRIDE the System Message (The crucial part)
+    # We explicitly forbid the model from using anything except OUR tools
+    prompt.messages[0].prompt.template = (
+        "You are a helpful assistant for TechGadgets. "
+        "IMPORTANT: You have ONLY TWO tools: 'techgadgets_service_search' and 'custom_pricing_calculator'. "
+        "DO NOT attempt to use 'repo_browser', 'web_search', or any other tool. "
+        "If you don't know an answer, use 'techgadgets_service_search' to find it in the company documents."
+    )
+    
+    # 3. Create the agent with this new strict prompt
+    agent = create_tool_calling_agent(llm, tools, prompt)
     
     # Create the executor
     agent_executor = AgentExecutor(
